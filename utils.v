@@ -2,7 +2,7 @@ module alu (
   input [31:0] A,
   input [31:0] B,
   input [1:0]  ALUctrl,
-  output reg ZF,
+  output ZF,
   output reg [31:0] ALUout
 );
 

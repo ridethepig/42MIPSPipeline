@@ -1,11 +1,11 @@
 module decoder (
   input [31:0] inst,
   output reg [2:0] op,
-  output reg [4:0] rs,
-  output reg [4:0] rt,
-  output reg [4:0] rd,
-  output reg [15:0] imm,
-  output reg [25:0] target
+  output [4:0] rs,
+  output [4:0] rt,
+  output [4:0] rd,
+  output [15:0] imm,
+  output [25:0] target
 );
 parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
           op_sw = 3'd4, op_beq = 3'd5, op_jal = 3'd6, op_und = 3'd7;
