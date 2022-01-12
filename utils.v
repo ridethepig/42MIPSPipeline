@@ -25,7 +25,7 @@ endmodule
 
 module extender (
   input [15:0] w_in,
-  input extSZ,
+  input extSZ, // 0 -> zero exr, 1 -> sign ext
   output [31:0] dw_out
 );
 

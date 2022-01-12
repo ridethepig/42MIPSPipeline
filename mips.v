@@ -6,7 +6,7 @@ input rst;
 // FSM states
 parameter s_InstFetch = 4'd0, 
           s_Decode = 4'd1, 
-          s_MemCalc = 4'd2, s_MemLoad = 4'd3, s_MemWrite = 4'd4, s_RegWrite = 4'd5, 
+          s_MCalc = 4'd2, s_MLoad = 4'd3, s_MStore = 4'd4, s_MLoadFinish = 4'd5, 
           s_RExec = 4'd6, s_RFinish = 4'd7,
           s_OrExec = 4'd8, s_OrFinish = 4'd9,
           s_BrFinish = 4'd10, s_JaFinish = 4'd11;
@@ -40,7 +40,7 @@ reg [3:0] state, next_state;
 
 pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC), .PC(PC[31:2]), .PCWr(PCWr));
 im_4k U_IM (.addr(PC[9:0]), .dout(im_dout));
-dm_4k U_DM (.addr(r_ALUout[11:2]), .din(dm_din), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
+dm_4k U_DM (.addr(r_ALUout[11:2]), .din(r_rB), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
 rf    U_RF (.clk(clk), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
             .doutA(rf_doutA), .doutB(rf_doutB));
 decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(i_target));
@@ -72,7 +72,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
       s_Decode:
         case (op)
           op_addu, op_subu: next_state = s_RExec;
-          op_lw, op_sw: next_state = s_MemCalc;
+          op_lw, op_sw: next_state = s_MCalc;
           op_ori: next_state = s_OrExec;
           op_beq: next_state = s_BrFinish;
           op_jal: next_state = s_JaFinish;
@@ -80,9 +80,9 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
         endcase
       s_RExec: next_state = s_RFinish;
       s_OrExec: next_state = s_OrFinish;
-      s_MemCalc: if (op == op_sw) next_state = s_MemWrite;
-                else next_state = s_MemLoad;      
-      s_MemLoad: next_state = s_RegWrite;
+      s_MCalc: if (op == op_sw) next_state = s_MStore;
+                else next_state = s_MLoad;      
+      s_MLoad: next_state = s_MLoadFinish;
       default: next_state = s_InstFetch;
     endcase
   end
@@ -102,7 +102,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
   end
 
   always @(posedge clk) begin
-    if (state == s_RExec || state == s_OrExec || state == s_MemCalc)
+    if (state == s_RExec || state == s_OrExec || state == s_MCalc)
       r_ALUout <= ALUout;
   end
 
@@ -111,7 +111,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
   end
 
   always @(posedge clk) begin
-    if (state == s_MemLoad) r_DR <= dm_dout;
+    if (state == s_MLoad) r_DR <= dm_dout;
   end
 
 //-----------------------------------------------------------------------------
@@ -134,7 +134,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
     else if (state == s_Decode) alu_ctrl = 2'b00; // add to gen PC + 4 + imm
     else if (state == s_BrFinish) alu_ctrl = 2'b01; // sub to compare
     else if (state == s_OrExec) alu_ctrl = 2'b10;  // or, different op
-    else if (state == s_MemCalc) alu_ctrl = 2'b00; // add to calc mem addr
+    else if (state == s_MCalc) alu_ctrl = 2'b00; // add to calc mem addr
     else if (op == op_addu) alu_ctrl = 2'b00; 
     else if (op == op_subu) alu_ctrl = 2'b01;
     else alu_ctrl = 2'b11; // we dont care otherwise
@@ -148,24 +148,36 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
   always @(state) begin
     if (state == s_InstFetch) alu_B_sel = 2'b00; // select 4
     else if (state == s_Decode) alu_B_sel = 2'b10; // select sExt[imm] << 2
-    else if (state == s_RExec) alu_B_sel = 2'b01; // select R[rt]
-    else alu_B_sel = 2'b11; // ORI, select zExt[imm]
+    else if (state == s_RExec) alu_B_sel = 2'b01; // select R[rt]    
+    else alu_B_sel = 2'b11; // ORI, MCalc, select Ext[imm]
   end // ALU input B mux
 
   always @(state) begin
     if (state == s_OrExec) extSZ = 1'b0;
     else extSZ = 1'b1;
-  end
+  end // extender sign or zero
 
   always @(state) begin
     if (state == s_JaFinish) rf_W_sel = 2'b10; // select r[31] to set ret addr
     else if (state == s_RFinish) rf_W_sel = 2'b01; // select rd
-    else rf_W_sel = 2'b00; // select rt
-  end
+    else rf_W_sel = 2'b00; // select rt, s_OriExec, s_MLoadFin
+  end // register file write selector
 
   always @(state) begin
     if (state == s_JaFinish) rf_din_sel = 2'b10; // select PC + 4 to set ret addr
     else if (state == s_RFinish) rf_din_sel = 2'b01; // select aluout to write back rs + rt
-    else rf_din_sel = 2'b00; // select rd to load dm
-  end
+    else rf_din_sel = 2'b00; // select DR to load dm
+  end // register file write data src
+
+  always @(state) begin
+    if (state == s_JaFinish || state == s_MStore 
+    || state == s_RFinish || state == s_MLoadFinish || state == s_OrFinish) RFWr = 1'b1;
+    else RFWr = 1'b0;
+  end // register file write control, only beq doesnt need to write back
+
+  always @(state) begin
+    if (state == s_MStore) DMWr = 1'b1;
+    else DMWr = 1'b0;
+  end // DM write control, only one operation require write permission
+
 endmodule
