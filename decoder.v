@@ -14,14 +14,14 @@ parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
     case (inst[31:26])
       6'b000000: begin
         if (inst[5:0] == 6'b100001) op = op_addu;
-        else if (inst[5:0] == 6'b100010) op = op_subu;
+        else if (inst[5:0] == 6'b100011) op = op_subu;
         else op = op_und;        
       end
       6'b001101: op = op_ori;
       6'b100011: op = op_lw;
       6'b101011: op = op_sw;
       6'b000100: op = op_beq;
-      6'b000010: op = op_jal;
+      6'b000011: op = op_jal;
       default: op = op_und;
     endcase
   end

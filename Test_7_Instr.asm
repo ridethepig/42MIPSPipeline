@@ -21,6 +21,7 @@
 	lw $5, 4($0)
 	beq $3, $5, _lb1
 	jal F_Test_JAL		# $31 change
+	addu $4, $2, $3
 	# Never return
 	
 F_Test_JAL:

@@ -15,7 +15,7 @@ parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
           op_sw = 3'd4, op_beq = 3'd5, op_jal = 3'd6;
 // ----------------------------------------------------------------------------
 // ------------------------------ signals -------------------------------------
-
+wire [29:0] PC_0;
 wire [31:0] PC, NPC; // PC
 
 reg PCWr, DMWr, RFWr, extSZ, alu_A_sel;
@@ -38,10 +38,11 @@ reg [3:0] state, next_state;
 //-----------------------------------------------------------------------------
 // ------------------------- module connections -------------------------------
 
-pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC), .PC(PC[31:2]), .PCWr(PCWr));
-im_4k U_IM (.addr(PC[9:0]), .dout(im_dout));
+pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC[31:2]), .PC(PC_0), .PCWr(PCWr));
+assign PC = {PC_0, 2'b00};
+im_4k U_IM (.addr(PC_0[9:0]), .dout(im_dout));
 dm_4k U_DM (.addr(r_ALUout[11:2]), .din(r_rB), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
-rf    U_RF (.clk(clk), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
+rf    U_RF (.clk(clk), .rst(rst), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
             .doutA(rf_doutA), .doutB(rf_doutB));
 decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(i_target));
 alu       U_ALU (.A(alu_A), .B(alu_B), .ALUctrl(alu_ctrl), .ZF(ZF), .ALUout(ALUout));
@@ -51,7 +52,7 @@ assign target = {PC[31:28], i_target, 2'b00};
 mux3to1 #(.n( 5)) MUX_RF_w (.selA(rt), .selB(rd), .selC(5'd31), 
                             .sel(rf_W_sel), .mux_out(rf_w));
 mux3to1 #(.n(32)) MUX_RF_din (.selA(r_DR), .selB(r_ALUout), .selC(PC),
-                            .sel(rf_din_sel), .mux_out(dm_din));
+                            .sel(rf_din_sel), .mux_out(rf_din));
 mux2to1 #(.n(32)) MUX_ALU_A(.selA(PC), .selB(r_rA), 
                             .sel(alu_A_sel), .mux_out(alu_A));
 mux4to1 #(.n(32)) MUX_ALU_B(.selA(32'd4), .selB(r_rB), .selC(ext_out_lsh2), .selD(ext_out),
@@ -61,8 +62,8 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
 //-----------------------------------------------------------------------------
 //---------------------------- FSM --------------------------------------------
   
-  always @(posedge clk, negedge rst) begin
-    if (!rst) state <= s_InstFetch;
+  always @(posedge clk, posedge rst) begin
+    if (rst) state <= s_InstFetch;
     else state <= next_state;
   end
 
@@ -141,14 +142,14 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
   end // ALU control, [TODO] refactor into case
 
   always @(state) begin
-    if (state == s_InstFetch) alu_A_sel = 1'b0; // only in cycle1 we select PC as addend
+    if (state == s_InstFetch || state == s_Decode) alu_A_sel = 1'b0; 
     else alu_A_sel = 1'b1; // otherwise, select R[rs]
   end // ALU input A mux
 
   always @(state) begin
     if (state == s_InstFetch) alu_B_sel = 2'b00; // select 4
     else if (state == s_Decode) alu_B_sel = 2'b10; // select sExt[imm] << 2
-    else if (state == s_RExec) alu_B_sel = 2'b01; // select R[rt]    
+    else if (state == s_RExec || state == s_BrFinish) alu_B_sel = 2'b01; // select R[rt]    
     else alu_B_sel = 2'b11; // ORI, MCalc, select Ext[imm]
   end // ALU input B mux
 
@@ -165,12 +166,12 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
 
   always @(state) begin
     if (state == s_JaFinish) rf_din_sel = 2'b10; // select PC + 4 to set ret addr
-    else if (state == s_RFinish) rf_din_sel = 2'b01; // select aluout to write back rs + rt
+    else if (state == s_RFinish || state == s_OrFinish) rf_din_sel = 2'b01; // select aluout to write back rs + rt
     else rf_din_sel = 2'b00; // select DR to load dm
   end // register file write data src
 
   always @(state) begin
-    if (state == s_JaFinish || state == s_MStore 
+    if (state == s_JaFinish 
     || state == s_RFinish || state == s_MLoadFinish || state == s_OrFinish) RFWr = 1'b1;
     else RFWr = 1'b0;
   end // register file write control, only beq doesnt need to write back

@@ -47,7 +47,7 @@ module mux3to1 ( selA, selB, selC, sel, mux_out);
 parameter n = 32;
 
 input wire [n-1: 0] selA, selB, selC;
-input wire sel;
+input wire [1:0]sel;
 output reg [n-1: 0] mux_out;
 
 always @(selA, selB, selC, sel) begin
@@ -65,7 +65,7 @@ module mux4to1 ( selA, selB, selC, selD, sel, mux_out);
 parameter n = 32;
 
 input wire [n-1: 0] selA, selB, selC, selD;
-input wire sel;
+input wire [1:0] sel;
 output reg [n-1: 0] mux_out;
 
 always @(selA, selB, selC, sel) begin
