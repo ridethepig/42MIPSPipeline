@@ -25,11 +25,11 @@ endmodule
 
 module extender (
   input [15:0] w_in,
-  input SZ,
+  input extSZ,
   output [31:0] dw_out
 );
 
-assign dw_out = SZ ? {{16{w_in[15]}}, w_in} : {16'b0, w_in};
+assign dw_out = extSZ ? {{16{w_in[15]}}, w_in} : {16'b0, w_in};
 
 endmodule
 

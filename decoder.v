@@ -31,37 +31,4 @@ parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
   assign rd = inst[15:11];
   assign imm = inst[15:0];
   assign target = inst[25:0];
-
-  always @(inst) begin
-    case (inst[31:26])
-      6'b000000: begin
-        rs = inst[25:21];
-        rt = inst[20:16];
-        rd = inst[15:11];
-        imm = 16'b0; 
-        target = 26'b0;
-      end // R type
-      6'b001101, 6'b101011, 6'b100011, 6'b000100: begin
-        rs = inst[25:21];
-        rt = inst[20:16];
-        rd = 5'b0;
-        imm = inst[15:0]; 
-        target = 26'b0;
-      end // I type
-      6'b000010: begin
-        rs = 5'b0;
-        rt = 5'b0;
-        rd = 5'b0;
-        imm = 16'b0; 
-        target = inst[25:0];
-      end // J type
-      default: begin
-        rs = 5'b0;
-        rt = 5'b0;
-        rd = 5'b0;
-        imm = 16'b0; 
-        target = 26'b0;
-      end // F type
-    endcase
-  end
 endmodule

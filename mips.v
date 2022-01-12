@@ -18,16 +18,17 @@ parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
 
 wire [31:0] PC, NPC; // PC
 
-reg PCWr, DMWr, RFWr, extSZ, addendA_sel;
-reg [1:0] ALUctrl, addendB_sel, rf_w_sel; // ctrl signals
+reg PCWr, DMWr, RFWr, extSZ, alu_A_sel;
+reg [1:0] alu_ctrl, alu_B_sel, rf_W_sel, rf_din_sel, pc_sel; // ctrl signals
 
 wire ZF;
 wire [2:0] op;
 wire [4:0] rs, rt, rd, rf_w;
 wire [15:0] imm;
 wire [25:0] target;
-wire [31:0] dm_din, dm_dout, rf_din, im_dout;
-wire [31:0] addendA, addendB, ALUout, rf_doutA, rf_doutB;
+wire [31:0] dm_din, dm_dout, rf_din, rf_doutA, rf_doutB, im_dout;
+wire [31:0] alu_A, alu_B, ALUout;
+wire [31:0] ext_out, ext_out_lsh2;
 
 reg [31:0] r_IR, r_rA, r_rB, r_ALUout, r_DR, r_target; // middle registers
 
@@ -36,19 +37,26 @@ reg [3:0] state, next_state;
 //-----------------------------------------------------------------------------
 // ------------------------- module connections -------------------------------
 
-pc U_PC (.clk(clk), .rst(rst), .NPC(NPC), .PC(PC[31:2]), .PCWr(PCWr));
+pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC), .PC(PC[31:2]), .PCWr(PCWr));
 im_4k U_IM (.addr(PC[9:0]), .dout(im_dout));
 dm_4k U_DM (.addr(r_ALUout[11:2]), .din(dm_din), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
-rf U_RF(.clk(clk), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
-        .doutA(rf_doutA), .doutB(rf_doutB));
-decoder U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(target));
-alu U_ALU (.A(addendA), .B(addendB), .ALUctrl(ALUctrl), .ZF(ZF), .ALUout(ALUout));
-extender U_EXT (.w_in())
-mux3to1 #(.n(5)) MUX_rf_w (.selA(rt), .selB(rd), .selC(5'd31), .sel(rf_w_sel), .mux_out(rf_w));
-mux2to1 #(.n(32)) MUX_ALU_A (.selA(PC), .selB(r_rA), .sel(addendA_sel), .mux_out(addendA));
-mux4to1 #(.n(32)) MUX_ALU_B (.selA(32'd4), .selB(r_rB),
-                             .sel(addendB_sel), .mux_out(addendB));
+rf    U_RF (.clk(clk), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
+            .doutA(rf_doutA), .doutB(rf_doutB));
+decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(target));
+alu       U_ALU (.A(alu_A), .B(alu_B), .ALUctrl(alu_ctrl), .ZF(ZF), .ALUout(ALUout));
+extender  U_EXT (.w_in(imm), .extSZ(extSZ), .dw_out(ext_out));
+assign ext_out_lsh2 = {ext_out[29:0], 2'b0};
 
+mux3to1 #(.n( 5)) MUX_RF_w (.selA(rt), .selB(rd), .selC(5'd31), 
+                            .sel(rf_W_sel), .mux_out(rf_w));
+mux3to1 #(.n(32)) MUX_RF_din (.selA(r_DR), .selB(r_ALUout), .selC(PC),
+                            .sel(rf_din_sel), .mux_out(dm_din));
+mux2to1 #(.n(32)) MUX_ALU_A(.selA(PC), .selB(r_rA), 
+                            .sel(alu_A_sel), .mux_out(alu_A));
+mux4to1 #(.n(32)) MUX_ALU_B(.selA(32'd4), .selB(r_rB), .selC(ext_out_lsh2), .selD(ext_out),
+                            .sel(alu_B_sel), .mux_out(alu_B));
+mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
+                          .sel(pc_sel), .mux_out(NPC));
 //-----------------------------------------------------------------------------
 //---------------------------- FSM --------------------------------------------
   
