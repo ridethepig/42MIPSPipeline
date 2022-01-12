@@ -25,10 +25,11 @@ wire ZF;
 wire [2:0] op;
 wire [4:0] rs, rt, rd, rf_w;
 wire [15:0] imm;
-wire [25:0] target;
+wire [25:0] i_target;
 wire [31:0] dm_din, dm_dout, rf_din, rf_doutA, rf_doutB, im_dout;
 wire [31:0] alu_A, alu_B, ALUout;
 wire [31:0] ext_out, ext_out_lsh2;
+wire [31:0] target;
 
 reg [31:0] r_IR, r_rA, r_rB, r_ALUout, r_DR, r_target; // middle registers
 
@@ -42,11 +43,11 @@ im_4k U_IM (.addr(PC[9:0]), .dout(im_dout));
 dm_4k U_DM (.addr(r_ALUout[11:2]), .din(dm_din), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
 rf    U_RF (.clk(clk), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
             .doutA(rf_doutA), .doutB(rf_doutB));
-decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(target));
+decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(i_target));
 alu       U_ALU (.A(alu_A), .B(alu_B), .ALUctrl(alu_ctrl), .ZF(ZF), .ALUout(ALUout));
 extender  U_EXT (.w_in(imm), .extSZ(extSZ), .dw_out(ext_out));
 assign ext_out_lsh2 = {ext_out[29:0], 2'b0};
-
+assign target = {PC[31:28], i_target, 2'b00};
 mux3to1 #(.n( 5)) MUX_RF_w (.selA(rt), .selB(rd), .selC(5'd31), 
                             .sel(rf_W_sel), .mux_out(rf_w));
 mux3to1 #(.n(32)) MUX_RF_din (.selA(r_DR), .selB(r_ALUout), .selC(PC),
@@ -61,7 +62,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
 //---------------------------- FSM --------------------------------------------
   
   always @(posedge clk, negedge rst) begin
-    if (!rst) state <= 4'b0;
+    if (!rst) state <= s_InstFetch;
     else state <= next_state;
   end
 
@@ -116,8 +117,55 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
 //-----------------------------------------------------------------------------
 //----------------------------- Control Signals -------------------------------
 
+  always @(state, ZF) begin
+    if (state == s_InstFetch || state == s_JaFinish) PCWr = 1'b1;
+    else if (state == s_BrFinish && ZF) PCWr = 1'b1;
+    else PCWr = 1'b0;
+  end // PC write ctrl
+
   always @(state) begin
-    
+    if (state == s_InstFetch) pc_sel = 2'b01; // selB--ALUout
+    else if (state == s_BrFinish) pc_sel = 2'b00; // selA--r_target
+    else pc_sel = 2'b10; // selC--inst_target
   end
 
+  always @(state, op) begin
+    if (state == s_InstFetch) alu_ctrl = 2'b00; // add to gen PC + 4
+    else if (state == s_Decode) alu_ctrl = 2'b00; // add to gen PC + 4 + imm
+    else if (state == s_BrFinish) alu_ctrl = 2'b01; // sub to compare
+    else if (state == s_OrExec) alu_ctrl = 2'b10;  // or, different op
+    else if (state == s_MemCalc) alu_ctrl = 2'b00; // add to calc mem addr
+    else if (op == op_addu) alu_ctrl = 2'b00; 
+    else if (op == op_subu) alu_ctrl = 2'b01;
+    else alu_ctrl = 2'b11; // we dont care otherwise
+  end // ALU control, [TODO] refactor into case
+
+  always @(state) begin
+    if (state == s_InstFetch) alu_A_sel = 1'b0; // only in cycle1 we select PC as addend
+    else alu_A_sel = 1'b1; // otherwise, select R[rs]
+  end // ALU input A mux
+
+  always @(state) begin
+    if (state == s_InstFetch) alu_B_sel = 2'b00; // select 4
+    else if (state == s_Decode) alu_B_sel = 2'b10; // select sExt[imm] << 2
+    else if (state == s_RExec) alu_B_sel = 2'b01; // select R[rt]
+    else alu_B_sel = 2'b11; // ORI, select zExt[imm]
+  end // ALU input B mux
+
+  always @(state) begin
+    if (state == s_OrExec) extSZ = 1'b0;
+    else extSZ = 1'b1;
+  end
+
+  always @(state) begin
+    if (state == s_JaFinish) rf_W_sel = 2'b10; // select r[31] to set ret addr
+    else if (state == s_RFinish) rf_W_sel = 2'b01; // select rd
+    else rf_W_sel = 2'b00; // select rt
+  end
+
+  always @(state) begin
+    if (state == s_JaFinish) rf_din_sel = 2'b10; // select PC + 4 to set ret addr
+    else if (state == s_RFinish) rf_din_sel = 2'b01; // select aluout to write back rs + rt
+    else rf_din_sel = 2'b00; // select rd to load dm
+  end
 endmodule
