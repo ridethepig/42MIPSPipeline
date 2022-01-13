@@ -15,10 +15,9 @@ parameter op_addu = 3'd0, op_subu = 3'd1, op_ori = 3'd2, op_lw = 3'd3,
           op_sw = 3'd4, op_beq = 3'd5, op_jal = 3'd6;
 // ----------------------------------------------------------------------------
 // ------------------------------ signals -------------------------------------
-wire [29:0] PC_0;
 wire [31:0] PC, NPC; // PC
 
-reg PCWr, DMWr, RFWr, extSZ, alu_A_sel;
+reg PCWr, DMWr, RFWr, ext_SZ, alu_A_sel;
 reg [1:0] alu_ctrl, alu_B_sel, rf_W_sel, rf_din_sel, pc_sel; // ctrl signals
 
 wire ZF;
@@ -38,15 +37,15 @@ reg [3:0] state, next_state;
 //-----------------------------------------------------------------------------
 // ------------------------- module connections -------------------------------
 
-pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC[31:2]), .PC(PC_0), .PCWr(PCWr));
-assign PC = {PC_0, 2'b00};
-im_4k U_IM (.addr(PC_0[9:0]), .dout(im_dout));
+pc    U_PC (.clk(clk), .rst(rst), .NPC(NPC), .PC(PC), .PCWr(PCWr));
+
+im_4k U_IM (.addr(PC[11:2]), .dout(im_dout));
 dm_4k U_DM (.addr(r_ALUout[11:2]), .din(r_rB), .DMWr(DMWr), .clk(clk), .dout(dm_dout));
 rf    U_RF (.clk(clk), .rst(rst), .A(rs), .B(rt), .W(rf_w), .din(rf_din), .RFWr(RFWr),
             .doutA(rf_doutA), .doutB(rf_doutB));
 decoder   U_Decoder (.inst(r_IR),.op(op),.rs(rs),.rt(rt),.rd(rd),.imm(imm),.target(i_target));
 alu       U_ALU (.A(alu_A), .B(alu_B), .ALUctrl(alu_ctrl), .ZF(ZF), .ALUout(ALUout));
-extender  U_EXT (.w_in(imm), .extSZ(extSZ), .dw_out(ext_out));
+extender  U_EXT (.w_in(imm), .extSZ(ext_SZ), .dw_out(ext_out));
 assign ext_out_lsh2 = {ext_out[29:0], 2'b0};
 assign target = {PC[31:28], i_target, 2'b00};
 mux3to1 #(.n( 5)) MUX_RF_w (.selA(rt), .selB(rd), .selC(5'd31), 
@@ -82,7 +81,7 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
       s_RExec: next_state = s_RFinish;
       s_OrExec: next_state = s_OrFinish;
       s_MCalc: if (op == op_sw) next_state = s_MStore;
-                else next_state = s_MLoad;      
+               else next_state = s_MLoad;      
       s_MLoad: next_state = s_MLoadFinish;
       default: next_state = s_InstFetch;
     endcase
@@ -154,8 +153,8 @@ mux3to1 #(.n(32)) MUX_PC (.selA(r_target), .selB(ALUout), .selC(target),
   end // ALU input B mux
 
   always @(state) begin
-    if (state == s_OrExec) extSZ = 1'b0;
-    else extSZ = 1'b1;
+    if (state == s_OrExec) ext_SZ = 1'b0;
+    else ext_SZ = 1'b1;
   end // extender sign or zero
 
   always @(state) begin
