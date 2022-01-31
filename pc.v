@@ -1,6 +1,6 @@
 module pc (
-  input [31:0] NPC,
-  input PCWr,
+  input [31:0] PCNext,
+  input PCWrite,
   input clk,
   input rst,
   output reg [31:0] PC
@@ -8,7 +8,7 @@ module pc (
 
 always @(posedge clk, posedge rst) begin
   if (rst) PC <= 32'h3000;
-  else if (PCWr) PC <= NPC;
+  else if (PCWrite) PC <= PCNext;
 end
 
 endmodule
