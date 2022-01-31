@@ -1,6 +1,6 @@
 // * ------------------------- Pipeline Register Signals ----------------------
 
-`define Instr       31:0
+`define Inst       31:0
 `define Iop     31:26
 `define Irs     25:21
 `define Irt     20:16
