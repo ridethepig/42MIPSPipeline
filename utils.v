@@ -3,7 +3,8 @@ module alu (
   input [31:0] dInA,
   input [31:0] dInB,
   input [3:0]  ALUOp,
-  output reg [31:0] dOut
+  output reg [31:0] dOut,
+  output reg [1:0] dCmp
 );
 
 always @(ALUOp, dInA, dInB) begin
@@ -16,6 +17,13 @@ always @(ALUOp, dInA, dInB) begin
     `ALU_op_xor: dOut = dInA ^ dInB;
     default: dOut = 32'b0;
   endcase
+end
+
+always @(ALUOp, dInA, dInB) begin
+    if (ALUOp == `ALU_op_cmp && dInA == dInB) begin
+        dCmp = 2'b11;        
+    end
+    else dCmp = 2'b00;
 end
 
 endmodule
@@ -71,7 +79,7 @@ always @(A, B, C, sel)
 
 endmodule
 
-module Adder(
+module adder(
     input wire [31:0] dInA,
     input wire [31:0] dInB,
     output wire [31:0] dOut
@@ -81,10 +89,10 @@ assign dOut = dInA + dInB;
 
 endmodule
 
-module JumpAdder (
+module jmpAdder (
     input wire [25:0] dInAddr,
-    input wire [31:28] dInPC,
+    input wire [31:0] dInPC,
     output wire [31:0] dOut
 );
-assign dOut = {dInPC, dInAddr, 2'b00};
+assign dOut = {dInPC[31:28], dInAddr, 2'b00};
 endmodule

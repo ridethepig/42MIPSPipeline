@@ -10,6 +10,7 @@
 `define Iimm    15: 0
 `define Iaddr   25: 0
 
+`define CtrlSig     44:32
 `define MemRead     32
 `define MemWrite    33
 `define RegWrite    34
@@ -29,6 +30,7 @@
 
 // * ---------------------------- ALU operator --------------------------------
 
+`define ALU_op_cmp 4'd0
 `define ALU_op_add 4'd1
 `define ALU_op_sub 4'd2
 `define ALU_op_or  4'd3

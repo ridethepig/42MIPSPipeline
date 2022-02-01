@@ -61,14 +61,14 @@ endmodule
 
 module Brancher (
     input wire Br_cmp, 
-    output reg IDEX_Clear, output reg IFID_Clear, output reg PC_Br
+    output reg IDEX_Clear, output reg IFID_Clear, output reg PC_B
 );
 always @(Br_cmp) begin
     if (Br_cmp) begin
-        IDEX_Clear = 1'b1; IFID_Clear = 1'b1; PC_Br = 1'b1;
+        IDEX_Clear = 1'b1; IFID_Clear = 1'b1; PC_B = 1'b1;
     end
     else begin
-        IDEX_Clear = 1'b0; IFID_Clear = 1'b0; PC_Br = 1'b0;
+        IDEX_Clear = 1'b0; IFID_Clear = 1'b0; PC_B = 1'b0;
     end
 end
 endmodule
@@ -79,6 +79,8 @@ module Controller (
     output reg MemRead,
     output reg MemWrite,
     output reg RegWrite,
+    output reg PC_J,
+    output reg EXT_SZ,
     output reg [1:0] RegSrc,
     output reg [1:0] RegDst,
     output reg [1:0] ALUBSrc,
@@ -126,5 +128,17 @@ always @(inst)
         `OP_ori: ALUOp = `ALU_op_or;
         default: ALUOp = `ALU_op_add;
     endcase    
+
+always @(inst)
+    case (inst[`Iop])
+        `OP_jal: PC_J = 1'b1;        
+        default: PC_J = 1'b0;
+    endcase
+
+always @(inst)
+    case (inst[`Iop])
+        `OP_ori: EXT_SZ = 1'b0;        
+        default: EXT_SZ = 1'b1;
+    endcase
 
 endmodule
