@@ -119,10 +119,12 @@ always @(posedge clk, posedge rst) begin
     end
     else if (IFID_Clear)
         IFID <= 274'b0;
+`ifdef DEBUG
     $display("======================%10d============================", $time);
     $display("IFID.Inst: %8X, op: %6b, rs: %2d, rt: %2d, funct: %6b, imm: %4X, addr: %8X", 
         IFID[`Inst], IFID[`Iop], IFID[`Irs], IFID[`Irt], IFID[`Ifunct], IFID[`Iimm], IFID[`Iaddr]);    
     $display("IFID.PC4 : %8X", IFID[`PC4]);
+`endif
 end
 
 always @(posedge clk, posedge rst) begin
@@ -135,12 +137,14 @@ always @(posedge clk, posedge rst) begin
         IDEX[`Rrs] <= RF_dOutA; IDEX[`Rrt] <= RF_dOutB; IDEX[`ExtImm] <= ext_imm;
         IDEX[`BrPC] <= pc_br;   IDEX[`CtrlSig] <= ctrl_mux_0;
     end
+`ifdef DEBUG
     $display("IDEX.Inst: %8X\tIDEX.Ctrl: %b", IDEX[`Inst], IDEX[`CtrlSig]);
     $display("\tMemRead: %1b, MemWrite: %1b, RegWrite: %1b, RegSrc: %2b, RegDst: %2b, ALUBSrc: %2b, ALUOp: %4b",
         IDEX[`MemRead], IDEX[`MemWrite], IDEX[`RegWrite], IDEX[`RegSrc], IDEX[`RegDst], IDEX[`ALUBSrc], IDEX[`ALUOp]) ;    
     $display("IDEX.PC4 : %8X\tIDEX.BrPC: %8X", IDEX[`PC4], IDEX[`BrPC]);
     $display("IDEX.Rrs : %8X\tIDEX.Rrt : %8X", IDEX[`Rrs], IDEX[`Rrt]);
     $display("IDEX.ExtImm: %8X", IDEX[`ExtImm]);
+`endif
 end
 
 always @(posedge clk, posedge rst) begin
@@ -153,11 +157,13 @@ always @(posedge clk, posedge rst) begin
         EXMM <= IDEX;
         EXMM[`ALUResult] <= alu_result; EXMM[`Wrd] <= mux_regdst;
     end
+`ifdef DEBUG    
     $display("EXMM.Inst: %8X\tEXMM.Ctrl: %b", EXMM[`Inst], EXMM[`CtrlSig]);       
     $display("EXMM.PC4 : %8X\tEXMM.BrPC: %8X", EXMM[`PC4], EXMM[`BrPC]);
     $display("EXMM.Rrs : %8X\tEXMM.Rrt : %8X", EXMM[`Rrs], EXMM[`Rrt]);
     // $display("EXMM.ExtImm: %8X", EXMM[`ExtImm]);
     $display("EXMM.ALURes: %8X\tEXMM.Wrd: %d", EXMM[`ALUResult], EXMM[`Wrd]);    
+`endif
 end
 
 always @(posedge clk, posedge rst) begin
@@ -168,6 +174,7 @@ always @(posedge clk, posedge rst) begin
         MMWB <= EXMM;
         MMWB[`Wmem] <= DM_dOut;
     end
+`ifdef DEBUG
     $display("MMWB.Inst: %8X\tMMWB.Ctrl: %b", MMWB[`Inst], MMWB[`CtrlSig]);    
     $display("MMWB.PC4 : %8X\tMMWB.BrPC: %8X", MMWB[`PC4], MMWB[`BrPC]);
     $display("MMWB.Rrs : %8X\tMMWB.Rrt : %8X", MMWB[`Rrs], MMWB[`Rrt]);
@@ -175,6 +182,7 @@ always @(posedge clk, posedge rst) begin
     $display("MMWB.ALURes: %8X\tMMWB.Wrd: %d", MMWB[`ALUResult], MMWB[`Wrd]);
     $display("MMWB.Wmem: %8X", MMWB[`Wmem]);
     $display("--------------------------------------------------------------");
+`endif
 end
 
 endmodule
