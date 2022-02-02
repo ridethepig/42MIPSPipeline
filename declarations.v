@@ -1,3 +1,4 @@
+`define DEBUG
 // * ------------------------- Pipeline Register Signals ----------------------
 
 `define Inst       31:0
@@ -30,7 +31,7 @@
 
 // * ---------------------------- ALU operator --------------------------------
 
-`define ALU_op_cmp 4'd0
+`define ALU_op_cmp 4'd15
 `define ALU_op_add 4'd1
 `define ALU_op_sub 4'd2
 `define ALU_op_or  4'd3
@@ -42,10 +43,12 @@
 
 `define OP_R_Type   6'b000000
 `define OP_beq      6'b000100
-`define OP_jal      6'b000010
+`define OP_jal      6'b000011
 `define OP_lw       6'b100011
 `define OP_ori      6'b001101
 `define OP_sw       6'b101011
 
 `define FN_add      6'b100000
 `define FN_sub      6'b100010
+`define FN_addu     6'b100001
+`define FN_subu     6'd100011

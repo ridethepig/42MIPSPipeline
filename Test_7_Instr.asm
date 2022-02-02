@@ -27,6 +27,9 @@
 F_Test_JAL:
 	subu $6, $6, $2
 	sw $6, -4($29)
+	addu $2, $2, $3
+	addu $2, $2, $4
+	addu $2, $2, $5
 	_loop:
 	beq $3, $4, _loop
 	# Never return back

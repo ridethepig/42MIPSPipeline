@@ -34,9 +34,9 @@ end
 always @(IDEX_rt, EXMM_rd, EXMM_RegWrite) begin
     if (EXMM_RegWrite && EXMM_rd != 5'b0 && EXMM_rd == IDEX_rt)
         forwardB = 2'b10;
-    else if (MMWB_RegWrite && MMWB_rd != 5'b0 && MMWB_rd == IDEX_rs)
+    else if (MMWB_RegWrite && MMWB_rd != 5'b0 && MMWB_rd == IDEX_rt)
         forwardB = 2'b01;
-    else 
+    else
         forwardB = 2'b00;
 end
 
@@ -79,7 +79,6 @@ module Controller (
     output reg MemRead,
     output reg MemWrite,
     output reg RegWrite,
-    output reg PC_J,
     output reg EXT_SZ,
     output reg [1:0] RegSrc,
     output reg [1:0] RegDst,
@@ -97,8 +96,8 @@ always @(inst)
 
 always @(inst)
     case (inst[`Iop])
-        `OP_beq, `OP_lw: RegWrite = 1'b0;
-        default: RegWrite = 1'b1;
+        `OP_R_Type, `OP_jal, `OP_ori, `OP_lw: RegWrite = 1'b1;
+        default: RegWrite = 1'b0;
     endcase
 
 always @(inst)
@@ -112,8 +111,9 @@ always @(inst)
 always @(inst)
     case (inst[`Iop])
         `OP_R_Type: RegDst = 2'b00; // rd
+        `OP_jal: RegDst = 2'b10;    // jal, $ra
         default: RegDst = 2'b01;    // rt
-    endcase // Well, I have to admit it's a mistake to have 2bit for this sig
+    endcase
 
 always @(inst)
     case (inst[`Iop])
@@ -123,17 +123,12 @@ always @(inst)
 
 always @(inst)
     case (inst[`Iop])
-        `OP_R_Type: if (inst[`Ifunct] == `FN_add) ALUOp = `ALU_op_add;
+        `OP_R_Type: if (inst[`Ifunct] == `FN_addu) ALUOp = `ALU_op_add;
                     else ALUOp = `ALU_op_sub;
         `OP_ori: ALUOp = `ALU_op_or;
+        `OP_beq: ALUOp = `ALU_op_cmp;
         default: ALUOp = `ALU_op_add;
     endcase    
-
-always @(inst)
-    case (inst[`Iop])
-        `OP_jal: PC_J = 1'b1;        
-        default: PC_J = 1'b0;
-    endcase
 
 always @(inst)
     case (inst[`Iop])
@@ -141,4 +136,16 @@ always @(inst)
         default: EXT_SZ = 1'b1;
     endcase
 
+endmodule
+
+module isJType(
+    input [31:0] inst,
+    output reg PC_J
+);
+
+always @(inst)
+    case (inst[`Iop])
+        `OP_jal: PC_J = 1'b1;
+        default: PC_J = 1'b0;
+    endcase
 endmodule

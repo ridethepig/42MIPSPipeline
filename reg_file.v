@@ -10,17 +10,17 @@ module rf (
   output [31:0] doutA,
   output [31:0] doutB
 );
-// integer i;
+integer i;
 parameter N = 32;
 reg [31:0] reg_file[N-1:0];
 
 always @(posedge clk, posedge rst) begin
   if (rst) begin
-    // for (i = 0; i < N; i = i + 1)
-      // reg_file[i] <= 32'b0;
-      reg_file[0] <= 32'b0;
+    for (i = 0; i < N; i = i + 1)
+      reg_file[i] <= 32'b0;
+    //   reg_file[0] <= 32'b0;
   end
-  else if (RFWr) begin
+  else if (RFWr && W != 5'b0) begin // $zero is constant
     reg_file[W] <= din;
     `ifdef DEBUG
       $display("$%d <- 0x%8X", W, din);
