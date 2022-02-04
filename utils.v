@@ -3,9 +3,13 @@ module alu (
   input [31:0] dInA,
   input [31:0] dInB,
   input [3:0]  ALUOp,
-  output reg [31:0] dOut,
-  output reg [1:0] dCmp
+  output reg [31:0] dOut
 );
+// dInA: R[rs], shamt
+// dInB: R[rt], extImm
+
+wire [4:0] shamt;
+assign shamt = dInA[4:0];
 
 always @(ALUOp, dInA, dInB) begin
   case (ALUOp)
@@ -15,15 +19,34 @@ always @(ALUOp, dInA, dInB) begin
     `ALU_op_and: dOut = dInA & dInB;
     `ALU_op_nor: dOut = ~(dInA | dInB);
     `ALU_op_xor: dOut = dInA ^ dInB;
+    `ALU_op_slt: dOut = $signed(dInA) < $signed(dInB) ? 32'd1 : 32'd0;
+    `ALU_op_sltu: dOut = $unsigned(dInA) < $unsigned(dInB) ? 32'd1 : 32'd0;
+    `ALU_op_sll: dOut = dInB << shamt;
+    `ALU_op_srl: dOut = dInB >> shamt;
+    `ALU_op_sra: dOut = dInB >>> shamt;
+    `ALU_op_lui: dOut = {dInB[15:0], 16'd0};
     default: dOut = 32'b0;
   endcase
 end
+endmodule
 
-always @(ALUOp, dInA, dInB) begin
-    if (ALUOp == `ALU_op_cmp && dInA == dInB) begin
-        dCmp = 2'b11;        
-    end
-    else dCmp = 2'b00;
+module comparator(
+    input [5:0] CMPOp,
+    input [31:0] dInA, // R[rs]
+    input [31:0] dInB, // R[rt] or 0
+    output reg dOut
+);
+
+always @(CMPOp, dInA, dInB) begin
+    case (CMPOp)
+        `CMP_op_beq: if (dInA == dInB) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bne: if (dInA != dInB) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bltz: if (dInA[31]) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_blez: if (dInA <= 0) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bgtz: if (dInA > 0) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bgez: if (dInA >= 0) dOut = 1'b1; else dOut = 1'b0;
+        default: dOut = 1'b0;
+    endcase
 end
 
 endmodule
@@ -95,4 +118,16 @@ module jmpAdder (
     output wire [31:0] dOut
 );
 assign dOut = {dInPC[31:28], dInAddr, 2'b00};
+endmodule
+
+module memExtender (
+    input [31:0] dIn,
+    input [1:0]  EXTOp,
+    input [1:0] mode,
+    output reg [31:0] dOut
+);
+always @(EXTOp, dIn, mode)
+    if (EXTOp && mode == `MEM_op_byte) dOut = {{24{dIn[7]}}, dIn[7:0] };
+    else if (EXTOp && mode == `MEM_op_half) dOut = {{24{dIn[15]}}, dIn[15:0]};
+    else dOut = dIn;
 endmodule

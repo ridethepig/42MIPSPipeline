@@ -61,15 +61,23 @@ endmodule
 
 module Brancher (
     input wire Br_cmp, 
-    output reg IDEX_Clear, output reg IFID_Clear, output reg PC_B
+    input wire IDEX_Jr,
+    output reg IDEX_Clear, output reg IFID_Clear,
+    output reg [1:0] PC_BR
 );
-always @(Br_cmp) begin
-    if (Br_cmp) begin
-        IDEX_Clear = 1'b1; IFID_Clear = 1'b1; PC_B = 1'b1;
+always @(Br_cmp, IDEX_Jr) begin
+    if (Br_cmp || IDEX_Jr) begin
+        IDEX_Clear = 1'b1; IFID_Clear = 1'b1;
     end
     else begin
-        IDEX_Clear = 1'b0; IFID_Clear = 1'b0; PC_B = 1'b0;
+        IDEX_Clear = 1'b0; IFID_Clear = 1'b0;
     end
+end
+
+always @(Br_cmp, IDEX_Jr) begin
+    if (Br_cmp) PC_BR = 2'b10;
+    else if (IDEX_Jr) PC_BR = 2'b01;
+    else PC_BR = 2'b00;
 end
 endmodule
 
@@ -82,32 +90,48 @@ module Controller (
     output reg EXT_SZ,
     output reg [1:0] RegSrc,
     output reg [1:0] RegDst,
-    output reg [1:0] ALUBSrc,
-    output reg [3:0] ALUOp
+    output reg ALUASrc,
+    output reg ALUBSrc,
+    output reg [3:0] ALUOp,
+    output reg [2:0] CMPOp,
+    output reg ISJR,
+    output reg [1:0] MemMode,
+    output reg [1:0] MemExt
 );
 
-always @(inst)
-    if (inst[`Iop] == `OP_lw) MemRead = 1'b1;
-    else MemRead = 1'b0;
-
-always @(inst)
-    if (inst[`Iop] == `OP_sw) MemWrite = 1'b1;
-    else MemWrite = 1'b0;
-
+// MemRead
 always @(inst)
     case (inst[`Iop])
-        `OP_R_Type, `OP_jal, `OP_ori, `OP_lw: RegWrite = 1'b1;
+        `OP_lw, `OP_lh, `OP_lhu, `OP_lb, `OP_lbu: MemRead = 1'b1;
+        default: MemRead = 1'b0;
+    endcase
+
+// MemWrite
+always @(inst)
+    case (inst[`Iop])
+        `OP_sw, `OP_sh, `OP_sb: MemWrite = 1'b1;
+        default: MemWrite = 1'b0;
+    endcase
+
+// RegWrite
+always @(inst)
+    case (inst[`Iop])
+        `OP_R_Type, `OP_jal, // jalr belongs to R_Type
+        `OP_addi, `OP_addiu, `OP_andi, `OP_slti, `OP_sltiu, `OP_ori, `OP_xori, `OP_lui,
+        `OP_lw, `OP_lh, `OP_lhu, `OP_lb, `OP_lbu: RegWrite = 1'b1;
         default: RegWrite = 1'b0;
     endcase
 
+// RegSrc
 always @(inst)
-    case (inst[`Iop])
-        `OP_R_Type, `OP_ori: RegSrc = 2'b00; // ALUResult
-        `OP_lw : RegSrc = 2'b01; // Wmem
+    case (inst[`Iop])        
+        `OP_lw, `OP_lb, `OP_lbu, `OP_lh, `OP_lhu : RegSrc = 2'b01; // Wmem
         `OP_jal: RegSrc = 2'b10; // current PC + 4
-        default: RegSrc = 2'b11; // Reserved
+        `OP_R_Type: if (inst[`Ifunct] == `FN_jalr) RegSrc = 2'b10; else RegSrc = 2'b00;
+        default: RegSrc = 2'b00; // default ALUResult
     endcase
 
+// RegDst
 always @(inst)
     case (inst[`Iop])
         `OP_R_Type: RegDst = 2'b00; // rd
@@ -115,24 +139,90 @@ always @(inst)
         default: RegDst = 2'b01;    // rt
     endcase
 
+// ALUASrc
+always @(inst)
+    if (inst[`Iop] == 6'b0)
+        case (inst[`Iop])
+            `FN_sll, `FN_srl, `FN_sra: ALUASrc = 1'b1;
+            default: ALUASrc = 1'b0;
+        endcase
+    else ALUASrc = 1'b0;
+
+// ALUBSrc
 always @(inst)
     case (inst[`Iop])
-        `OP_lw, `OP_ori, `OP_sw: ALUBSrc = 2'b01;
-        default: ALUBSrc = 2'b00;
+        `OP_lw, `OP_lh, `OP_lhu, `OP_lb, `OP_lbu, `OP_sw, `OP_sh, `OP_sb,
+        `OP_addi, `OP_addiu, `OP_slti, `OP_sltiu, `OP_andi, `OP_ori, `OP_xori, `OP_lui: 
+            ALUBSrc = 1'b1;
+        default: ALUBSrc = 1'b0;
     endcase
 
+// ALUOp
 always @(inst)
     case (inst[`Iop])
-        `OP_R_Type: if (inst[`Ifunct] == `FN_addu) ALUOp = `ALU_op_add;
-                    else ALUOp = `ALU_op_sub;
-        `OP_ori: ALUOp = `ALU_op_or;
-        `OP_beq: ALUOp = `ALU_op_cmp;
-        default: ALUOp = `ALU_op_add;
-    endcase    
+        `OP_R_Type: 
+            case (inst[`Ifunct]) 
+                `FN_add, `FN_addu:  ALUOp = `ALU_op_add;
+                `FN_sub, `FN_subu:  ALUOp = `ALU_op_sub;
+                `FN_and:    ALUOp = `ALU_op_and;
+                `FN_or:     ALUOp = `ALU_op_or;
+                `FN_xor:    ALUOp = `ALU_op_xor;
+                `FN_nor:    ALUOp = `ALU_op_nor;
+                `FN_slt:    ALUOp = `ALU_op_slt;
+                `FN_sltu:   ALUOp = `ALU_op_sltu;
+                `FN_sll, `FN_sllv:  ALUOp = `ALU_op_sll;
+                `FN_srl, `FN_srlv:  ALUOp = `ALU_op_srl;
+                `FN_sra, `FN_srav:  ALUOp = `ALU_op_sra;
+            endcase
+        `OP_addi, `OP_addiu: ALUOp = `ALU_op_add;
+        `OP_slti:   ALUOp = `ALU_op_slt;
+        `OP_sltiu:  ALUOp = `ALU_op_sltu;
+        `OP_andi:   ALUOp = `ALU_op_and;
+        `OP_ori:    ALUOp = `ALU_op_or;
+        `OP_xori:   ALUOp = `ALU_op_xor;
+        `OP_lui:    ALUOp = `ALU_op_lui;
+        default:    ALUOp = `ALU_op_add;
+    endcase
 
+// CMPOp
 always @(inst)
     case (inst[`Iop])
-        `OP_ori: EXT_SZ = 1'b0;        
+        `OP_beq: CMPOp = `CMP_op_beq;
+        `OP_bne: CMPOp = `CMP_op_bne;
+        `OP_bltz: if (inst[`Irt] == 5'b0) CMPOp = `CMP_op_bltz;
+                    else CMPOp = `CMP_op_bgez;
+        `OP_blez: CMPOp = `CMP_op_blez;
+        `OP_bgtz: CMPOp = `CMP_op_bgtz;
+        default: CMPOp = 3'b0;
+    endcase
+
+// ISJR
+always @(inst)
+    if (inst[`Iop] == `OP_R_Type &&
+        (inst[`Ifunct] == `FN_jalr || inst[`Ifunct] == `FN_jr))
+        ISJR = 1'b1;
+    else ISJR = 1'b0;
+
+// MemMode
+always @(inst)
+    case (inst[`Iop])
+        `OP_sw, `OP_lw: MemMode = `MEM_op_word;
+        `OP_sh, `OP_lh, `OP_lhu: MemMode = `MEM_op_half;
+        `OP_sb, `OP_lb, `OP_lbu: MemMode = `MEM_op_byte;
+        default: MemMode = 2'b00;
+    endcase
+
+// MemExt
+always @(inst)
+    case (inst[`Iop])
+        `OP_lh, `OP_lb: MemExt = 2'b11;
+        default: MemExt = 2'b00;
+    endcase
+
+// EXT_SZ
+always @(inst)
+    case (inst[`Iop])
+        `OP_ori, `OP_andi, `OP_xori: EXT_SZ = 1'b0;
         default: EXT_SZ = 1'b1;
     endcase
 
@@ -145,7 +235,7 @@ module isJType(
 
 always @(inst)
     case (inst[`Iop])
-        `OP_jal: PC_J = 1'b1;
+        `OP_jal, `OP_j: PC_J = 1'b1;
         default: PC_J = 1'b0;
     endcase
 endmodule
