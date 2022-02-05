@@ -23,7 +23,7 @@ always @(ALUOp, dInA, dInB) begin
     `ALU_op_sltu: dOut = $unsigned(dInA) < $unsigned(dInB) ? 32'd1 : 32'd0;
     `ALU_op_sll: dOut = dInB << shamt;
     `ALU_op_srl: dOut = dInB >> shamt;
-    `ALU_op_sra: dOut = dInB >>> shamt;
+    `ALU_op_sra: dOut = $signed(dInB) >>> shamt;
     `ALU_op_lui: dOut = {dInB[15:0], 16'd0};
     default: dOut = 32'b0;
   endcase
@@ -31,7 +31,7 @@ end
 endmodule
 
 module comparator(
-    input [5:0] CMPOp,
+    input [2:0] CMPOp,
     input [31:0] dInA, // R[rs]
     input [31:0] dInB, // R[rt] or 0
     output reg dOut

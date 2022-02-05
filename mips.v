@@ -20,7 +20,8 @@ wire RF_Write;
 reg [`PLLen - 1:0] IFID, IDEX, EXMM, MMWB;
 // intermediate wires
 wire [31:0] pc_plus_4, pc_mux_br, pc_jmp, pc_mux_j, pc_br;
-wire PC_B, PC_J, EXT_SZ;
+wire [1:0] PC_BR;
+wire PC_J, EXT_SZ;
 wire CTRL_MemRead, CTRL_MemWrite, CTRL_RegWrite, CTRL_ALUASrc, CTRL_ALUBSrc, CTRL_ISJR;
 wire [1:0] CTRL_RegSrc, CTRL_RegDst, CTRL_MemMode, CTRL_MemExt;
 wire [2:0] CTRL_CMPOp;
@@ -57,7 +58,7 @@ adder ADDER_NPC(.dInA(pc), .dInB(32'd4), .dOut(pc_plus_4));
 isJType IS_JTYPE(.inst(inst), .PC_J(PC_J));
 jmpAdder ADDER_JPC(.dInAddr(inst[`Iaddr]), .dInPC(pc), .dOut(pc_jmp));
 mux2to1 #(.n(32)) MUX_PCJ(.A(pc_plus_4), .B(pc_jmp), .sel(PC_J), .dOut(pc_mux_j));
-mux2to1 #(.n(32)) MUX_PCB(.A(pc_mux_j), .B(IDEX[`BrPC]), .sel(PC_B), .dOut(pc_mux_br));
+mux3to1 #(.n(32)) MUX_PCB(.A(pc_mux_j), .B(IDEX[`Rrs]), .C(IDEX[`BrPC]), .sel(PC_BR), .dOut(pc_mux_br));
 assign npc = pc_mux_br;
 
 assign RF_rA = IFID[`Irs];
@@ -66,10 +67,10 @@ Controller U_CTRLR(.inst(IFID[`Inst]),  .MemRead(CTRL_MemRead), .MemWrite(CTRL_M
                     .RegWrite(CTRL_RegWrite), .RegSrc(CTRL_RegSrc), .RegDst(CTRL_RegDst), 
                     .ALUASrc(CTRL_ALUASrc), .ALUBSrc(CTRL_ALUBSrc), .ALUOp(CTRL_ALUOp), .EXT_SZ(EXT_SZ),
                     .CMPOp(CTRL_CMPOp), .ISJR(CTRL_ISJR), .MemMode(CTRL_MemMode), .MemExt(CTRL_MemExt));
-mux2to1 #(.n(13)) MUX_CTRL(
+mux2to1 #(.n(21)) MUX_CTRL(
     // .A({CTRL_MemRead, CTRL_MemWrite, CTRL_RegWrite, CTRL_RegSrc, CTRL_RegDst, CTRL_ALUBSrc, CTRL_ALUOp}),
-    .A({CTRL_MemExt, CTRL_MemMode, CTRL_ISJR, CTRL_CMPOp, CTRL_ALUOp, CTRL_ALUBSrc, CTRL_RegDst, CTRL_RegSrc, CTRL_RegWrite, CTRL_MemWrite, CTRL_MemRead}),
-    .B(13'b0), .sel(Ctrl_src | IDEX_Clear), .dOut(ctrl_mux_0));
+    .A({CTRL_MemExt, CTRL_MemMode, CTRL_ISJR, CTRL_CMPOp, CTRL_ALUOp, CTRL_ALUBSrc, CTRL_ALUASrc, CTRL_RegDst, CTRL_RegSrc, CTRL_RegWrite, CTRL_MemWrite, CTRL_MemRead}),
+    .B(21'b0), .sel(Ctrl_src | IDEX_Clear), .dOut(ctrl_mux_0));
 extender U_EXT(.dIn(IFID[`Iimm]), .SZ(EXT_SZ), .dOut(ext_imm));
 adder ADDER_BrPC(.dInA({ext_imm[29:0], 2'b00}), .dInB(IFID[`PC4]), .dOut(pc_br));
 
@@ -97,7 +98,7 @@ assign RF_dIn = mux_mr;
 
 // Hazard Handler
 
-Brancher U_BRANCHER(.Br_cmp(cmp_cmp), .PC_B(PC_B), .IDEX_Clear(IDEX_Clear), .IFID_Clear(IFID_Clear));
+Brancher U_BRANCHER(.Br_cmp(cmp_cmp), .PC_BR(PC_BR), .IDEX_Clear(IDEX_Clear), .IFID_Clear(IFID_Clear));
 HarzardDetector U_HAZARD (
     .IFID_rs(IFID[`Irs]), .IFID_rt(IFID[`Irt]), 
     .IDEX_rt(IDEX[`Irt]), .IDEX_MemRead(IDEX[`MemRead]), 
@@ -146,7 +147,7 @@ always @(posedge clk, posedge rst) begin
     end
 `ifdef DEBUG
     $display("IDEX.Inst: %8X\tIDEX.Ctrl: %b", IDEX[`Inst], IDEX[`CtrlSig]);
-    $display("\tMemRead: %b, MemWrite: %b, RegWrite: %b, RegSrc: %b, RegDst: %b, ALUASrc: b ALUBSrc: %b, ALUOp: %b, CMPOp: %b, MemMode: %b, MemExt: %b",
+    $display("\tMemRead: %b, MemWrite: %b, RegWrite: %b, RegSrc: %b, RegDst: %b, ALUASrc: %b ALUBSrc: %b, ALUOp: %2d, CMPOp: %2d, MemMode: %b, MemExt: %b",
         IDEX[`MemRead], IDEX[`MemWrite], IDEX[`RegWrite], IDEX[`RegSrc], 
         IDEX[`RegDst], IDEX[`ALUASrc], IDEX[`ALUBSrc], IDEX[`ALUOp], IDEX[`CMPOp], 
         IDEX[`MemMode], IDEX[`MemExt]);
@@ -164,7 +165,7 @@ always @(posedge clk, posedge rst) begin
         // EXMM[`Inst] <= IDEX[`Inst]; EXMM[`CtrlSig] <= IDEX[`CtrlSig];
         // EXMM[`PC4] <= IDEX[`PC4]; EXMM[`Rrs] <= IDEX[`Rrs]; EXMM[`Rrt] <= IDEX[`Rrt]; EXMM[`ExtImm] <= IDEX[`ExtImm]; EXMM[`BrPC] <= IDEX[`BrPC];
         EXMM <= IDEX;
-        EXMM[`ALUResult] <= alu_result; EXMM[`Wrd] <= mux_regdst;
+        EXMM[`ALUResult] <= alu_result; EXMM[`Wrd] <= mux_regdst; EXMM[`Rrt] <= mux_fwdb;
     end
 `ifdef DEBUG    
     $display("EXMM.Inst: %8X\tEXMM.Ctrl: %b", EXMM[`Inst], EXMM[`CtrlSig]);       

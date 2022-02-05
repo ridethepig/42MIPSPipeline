@@ -142,7 +142,7 @@ always @(inst)
 // ALUASrc
 always @(inst)
     if (inst[`Iop] == 6'b0)
-        case (inst[`Iop])
+        case (inst[`Ifunct])
             `FN_sll, `FN_srl, `FN_sra: ALUASrc = 1'b1;
             default: ALUASrc = 1'b0;
         endcase

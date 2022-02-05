@@ -29,7 +29,7 @@
 `define BrPC        116:85
 `define Rrs         148:117
 `define Rrt         180:149
-`define ExtImm      214:181
+`define ExtImm      212:181
 `define ALUResult   244:213
 `define Wrd         249:245 // The final register number to write in 
 `define Wmem        281:250 // Data fecthed from DM

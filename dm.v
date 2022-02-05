@@ -11,17 +11,18 @@ module dm_4k( addr, din, DMWr, clk, dout, mode );
     wire [11:2] _addr;
     wire [1:0] __addr;
     assign _addr = addr[11:2];
+    assign __addr = addr[1:0];
     always @(posedge clk) begin
         if (DMWr) begin
             if (mode == `MEM_op_byte)
-                case (addr[1:0])
+                case (__addr)
                     2'b00: dmem[_addr][ 7: 0] <= din[7:0];
                     2'b01: dmem[_addr][15: 8] <= din[7:0];
                     2'b10: dmem[_addr][23:16] <= din[7:0];
                     2'b11: dmem[_addr][31:24] <= din[7:0];
                 endcase
             else if (mode == `MEM_op_half)
-                case (addr[1:0])
+                case (__addr)
                     2'b00: dmem[_addr][15: 0] <= din[15:0];
                     2'b10: dmem[_addr][31:16] <= din[15:0];
                     default: dmem[_addr] <= din; // should raise exception, though not yet have that
@@ -33,7 +34,7 @@ module dm_4k( addr, din, DMWr, clk, dout, mode );
         end
     end
     // assign dout = dmem[addr];
-    always @(_addr, addr, din, mode)
+    always @(_addr, __addr, din, mode)
         if (mode == `MEM_op_byte)
             case (__addr)
                 2'b00: dout = {24'b0, dmem[_addr][ 7: 0]};
