@@ -58,7 +58,7 @@ adder ADDER_NPC(.dInA(pc), .dInB(32'd4), .dOut(pc_plus_4));
 isJType IS_JTYPE(.inst(inst), .PC_J(PC_J));
 jmpAdder ADDER_JPC(.dInAddr(inst[`Iaddr]), .dInPC(pc), .dOut(pc_jmp));
 mux2to1 #(.n(32)) MUX_PCJ(.A(pc_plus_4), .B(pc_jmp), .sel(PC_J), .dOut(pc_mux_j));
-mux3to1 #(.n(32)) MUX_PCB(.A(pc_mux_j), .B(IDEX[`Rrs]), .C(IDEX[`BrPC]), .sel(PC_BR), .dOut(pc_mux_br));
+mux3to1 #(.n(32)) MUX_PCB(.A(pc_mux_j), .B(mux_fwda), .C(IDEX[`BrPC]), .sel(PC_BR), .dOut(pc_mux_br));
 assign npc = pc_mux_br;
 
 assign RF_rA = IFID[`Irs];
@@ -98,7 +98,7 @@ assign RF_dIn = mux_mr;
 
 // Hazard Handler
 
-Brancher U_BRANCHER(.Br_cmp(cmp_cmp), .PC_BR(PC_BR), .IDEX_Clear(IDEX_Clear), .IFID_Clear(IFID_Clear));
+Brancher U_BRANCHER(.Br_cmp(cmp_cmp), .IDEX_Jr(IDEX[`ISJR]), .PC_BR(PC_BR), .IDEX_Clear(IDEX_Clear), .IFID_Clear(IFID_Clear));
 HarzardDetector U_HAZARD (
     .IFID_rs(IFID[`Irs]), .IFID_rt(IFID[`Irt]), 
     .IDEX_rt(IDEX[`Irt]), .IDEX_MemRead(IDEX[`MemRead]), 
@@ -131,7 +131,7 @@ always @(posedge clk, posedge rst) begin
     $display("======================%10d============================", $time);
     $display("IFID.Inst: %8X, op: %6b, rs: %2d, rt: %2d, funct: %6b, imm: %4X, addr: %8X", 
         IFID[`Inst], IFID[`Iop], IFID[`Irs], IFID[`Irt], IFID[`Ifunct], IFID[`Iimm], IFID[`Iaddr]);    
-    $display("IFID.PC4 : %8X", IFID[`PC4]);
+    $display("IFID.PC4 : %8X\n", IFID[`PC4]);
 `endif
 end
 
@@ -147,13 +147,13 @@ always @(posedge clk, posedge rst) begin
     end
 `ifdef DEBUG
     $display("IDEX.Inst: %8X\tIDEX.Ctrl: %b", IDEX[`Inst], IDEX[`CtrlSig]);
-    $display("\tMemRead: %b, MemWrite: %b, RegWrite: %b, RegSrc: %b, RegDst: %b, ALUASrc: %b ALUBSrc: %b, ALUOp: %2d, CMPOp: %2d, MemMode: %b, MemExt: %b",
+    $display("\tMemRead:%b, MemWrite:%b, RegWrite:%b, RegSrc:%b, RegDst:%b, ALUASrc:%b, ALUBSrc:%b, ALUOp:%2d, CMPOp:%2d, ISJR:%b, MemMode:%b, MemExt:%b",
         IDEX[`MemRead], IDEX[`MemWrite], IDEX[`RegWrite], IDEX[`RegSrc], 
         IDEX[`RegDst], IDEX[`ALUASrc], IDEX[`ALUBSrc], IDEX[`ALUOp], IDEX[`CMPOp], 
-        IDEX[`MemMode], IDEX[`MemExt]);
+        IDEX[`ISJR], IDEX[`MemMode], IDEX[`MemExt]);
     $display("IDEX.PC4 : %8X\tIDEX.BrPC: %8X", IDEX[`PC4], IDEX[`BrPC]);
     $display("IDEX.Rrs : %8X\tIDEX.Rrt : %8X", IDEX[`Rrs], IDEX[`Rrt]);
-    $display("IDEX.ExtImm: %8X", IDEX[`ExtImm]);
+    $display("IDEX.ExtImm: %8X\n", IDEX[`ExtImm]);
 `endif
 end
 
@@ -172,7 +172,7 @@ always @(posedge clk, posedge rst) begin
     $display("EXMM.PC4 : %8X\tEXMM.BrPC: %8X", EXMM[`PC4], EXMM[`BrPC]);
     $display("EXMM.Rrs : %8X\tEXMM.Rrt : %8X", EXMM[`Rrs], EXMM[`Rrt]);
     // $display("EXMM.ExtImm: %8X", EXMM[`ExtImm]);
-    $display("EXMM.ALURes: %8X\tEXMM.Wrd: %d", EXMM[`ALUResult], EXMM[`Wrd]);    
+    $display("EXMM.ALURes: %8X\tEXMM.Wrd: %d\n", EXMM[`ALUResult], EXMM[`Wrd]);    
 `endif
 end
 

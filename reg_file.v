@@ -28,7 +28,7 @@ always @(posedge clk, posedge rst) begin
   end
 end
 
-assign doutA = (A == W && RFWr) ? din : reg_file[A];
-assign doutB = (B == W && RFWr) ? din : reg_file[B];
+assign doutA = (A && A == W && RFWr) ? din : reg_file[A];
+assign doutB = (B && B == W && RFWr) ? din : reg_file[B];
 
 endmodule
