@@ -19,7 +19,7 @@ wire RF_Write;
 // Pipeline Registers; See declarations.v for every part's usage
 reg [`PLLen - 1:0] IFID, IDEX, EXMM, MMWB;
 // intermediate wires
-wire [31:0] pc_plus_4, pc_mux_br, pc_jmp, pc_mux_j, pc_br;
+wire [31:0] pc_plus_4, pc_mux_br, pc_jmp, pc_mux_j, br_pc;
 wire [1:0] PC_BR;
 wire PC_J, EXT_SZ;
 wire CTRL_MemRead, CTRL_MemWrite, CTRL_RegWrite, CTRL_ALUASrc, CTRL_ALUBSrc, CTRL_ISJR;
@@ -72,7 +72,7 @@ mux2to1 #(.n(21)) MUX_CTRL(
     .A({CTRL_MemExt, CTRL_MemMode, CTRL_ISJR, CTRL_CMPOp, CTRL_ALUOp, CTRL_ALUBSrc, CTRL_ALUASrc, CTRL_RegDst, CTRL_RegSrc, CTRL_RegWrite, CTRL_MemWrite, CTRL_MemRead}),
     .B(21'b0), .sel(Ctrl_src | IDEX_Clear), .dOut(ctrl_mux_0));
 extender U_EXT(.dIn(IFID[`Iimm]), .SZ(EXT_SZ), .dOut(ext_imm));
-adder ADDER_BrPC(.dInA({ext_imm[29:0], 2'b00}), .dInB(IFID[`PC4]), .dOut(pc_br));
+adder ADDER_BrPC(.dInA({ext_imm[29:0], 2'b00}), .dInB(IFID[`PC4]), .dOut(br_pc));
 
 mux3to1 #(.n(32)) MUX_FwdA(.A(IDEX[`Rrs]), .B(mux_mr), .C(EXMM[`ALUResult]), .sel(ALU_ForwardA), .dOut(mux_fwda));
 mux3to1 #(.n(32)) MUX_FwdB(.A(IDEX[`Rrt]), .B(mux_mr), .C(EXMM[`ALUResult]), .sel(ALU_ForwardB), .dOut(mux_fwdb));
@@ -143,7 +143,7 @@ always @(posedge clk, posedge rst) begin
         // IDEX[`Inst] <= IFID[`Inst];  IDEX[`PC4] <= IFID[`PC4];
         IDEX <= IFID;
         IDEX[`Rrs] <= RF_dOutA; IDEX[`Rrt] <= RF_dOutB; IDEX[`ExtImm] <= ext_imm;
-        IDEX[`BrPC] <= pc_br;   IDEX[`CtrlSig] <= ctrl_mux_0;
+        IDEX[`BrPC] <= br_pc;   IDEX[`CtrlSig] <= ctrl_mux_0;
     end
 `ifdef DEBUG
     $display("IDEX.Inst: %8X\tIDEX.Ctrl: %b", IDEX[`Inst], IDEX[`CtrlSig]);

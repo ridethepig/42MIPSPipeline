@@ -75,8 +75,18 @@ always @(Br_cmp, IDEX_Jr) begin
 end
 
 always @(Br_cmp, IDEX_Jr) begin
-    if (Br_cmp) PC_BR = 2'b10;
-    else if (IDEX_Jr) PC_BR = 2'b01;
+    if (Br_cmp) begin
+       PC_BR = 2'b10;
+`ifdef DEBUG
+        $display("Branch success");
+`endif 
+    end
+    else if (IDEX_Jr) begin
+        PC_BR = 2'b01;
+`ifdef DEBUG
+        $display("Jump Register");
+`endif        
+    end
     else PC_BR = 2'b00;
 end
 endmodule

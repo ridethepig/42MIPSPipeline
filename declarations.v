@@ -73,7 +73,7 @@
 `define OP_bgtz     6'b000111
 // J-Type
 `define OP_jal      6'b000011
-`define OP_j        6'b000011
+`define OP_j        6'b000010
 // ALU with immediate
 `define OP_addi     6'b001000
 `define OP_addiu    6'b001001

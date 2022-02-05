@@ -42,9 +42,9 @@ always @(CMPOp, dInA, dInB) begin
         `CMP_op_beq: if (dInA == dInB) dOut = 1'b1; else dOut = 1'b0;
         `CMP_op_bne: if (dInA != dInB) dOut = 1'b1; else dOut = 1'b0;
         `CMP_op_bltz: if (dInA[31]) dOut = 1'b1; else dOut = 1'b0;
-        `CMP_op_blez: if (dInA <= 0) dOut = 1'b1; else dOut = 1'b0;
-        `CMP_op_bgtz: if (dInA > 0) dOut = 1'b1; else dOut = 1'b0;
-        `CMP_op_bgez: if (dInA >= 0) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_blez: if ($signed(dInA) <= $signed(32'b0)) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bgtz: if ($signed(dInA) >  $signed(32'b0)) dOut = 1'b1; else dOut = 1'b0;
+        `CMP_op_bgez: if (dInA[31] == 1'b0) dOut = 1'b1; else dOut = 1'b0;
         default: dOut = 1'b0;
     endcase
 end
